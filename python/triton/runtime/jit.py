@@ -602,6 +602,15 @@ class JITFunction(KernelInterface[T]):
             attrvals = [x[1] for x in specialization]
             attrs = find_paths_if(attrvals, lambda _, x: isinstance(x, str))
             attrs = {k: backend.parse_attr(get_iterable_path(attrvals, k)) for k in attrs}
+
+            for plugin in config.runtime.jit_plugin_hooks:
+                kernel = self._call_hook(plugin, key, signature, device, constexprs, options, [attrs],
+                               warmup)
+                if kernel is not None:
+                    kernel_cache[key] = kernel
+                    break
+
+        if kernel is None:
             if self._call_hook(config.runtime.jit_cache_hook, key, signature, device, constexprs, options, [attrs],
                                warmup):
                 return None
@@ -690,7 +699,7 @@ class JITFunction(KernelInterface[T]):
         self.constexprs = [p.num for p in self.params if p.is_constexpr]
 
         # Hooks that will be called prior to executing "run"
-        self.pre_run_hooks = []
+        self.pre_run_hooks = config.runtime_config.jit_pre_run_hooks
 
         # reuse docs of wrapped function
         self.__doc__ = fn.__doc__

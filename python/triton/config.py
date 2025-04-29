@@ -323,6 +323,18 @@ class JITHook(Protocol):
     def __call__(self, *, key: str, repr: str, fn: JitFunctionInfo, compile: JITHookCompileInfo, is_manual_warmup: bool,
                  already_compiled: bool) -> Optional[bool]:
         ...
+class PluginHook(Protocol):
+    '''Plugin Hooks - return a kernel if successful'''
+
+    def __call__(self, *, key: str, repr: str, fn: JitFunctionInfo, compile: JITHookCompileInfo, is_manual_warmup: bool,
+                 already_compiled: bool) -> Any:
+        ...
+
+class PreRunHook(Protocol):
+    '''Plugin Hooks - return a kernel if successful'''
+
+    def __call__(self, *args, **kwargs) -> Any:
+        ...
 
 
 class runtime_config(base_config):
@@ -338,7 +350,14 @@ class runtime_config(base_config):
     # Hook to signal that a kernel is done compiling and inspect compiled function.
     # jit_cache_hook will always be called before compilation and jit_post_compile_hook after.
     jit_post_compile_hook: Optional[JITHook] = None
-
+    # Hooks for loading precompiled functions and modules bypassing the normal compiler
+    # These are intended for optimized implementations, shared cache, signed kernels and other
+    # use cases which are not covered by the normal "compile if absent" code path.
+    # The hooks in this list are executed until one of the returns a kernel. If one of them returns
+    # a kernel it is used by Triton instead of compiling one.
+    jit_plugin_hooks: list[PluginHook] = []
+    # Prerun hooks common for all invocations (these are added before per-instance pre-run hooks)
+    jit_pre_run_hooks: list[PreRunHook] = []
 
 class language_config(base_config):
     fp32_default: env_opt_str = env_opt_str("TRITON_F32_DEFAULT")
